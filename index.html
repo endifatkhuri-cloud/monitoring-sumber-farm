@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitoring Kandang Ayam</title>
+
+<style>
+body{margin:0;font-family:system-ui;background:#f1f8e9}
+.header{background:#1b5e20;color:#fff;padding:12px;display:flex;justify-content:space-between;align-items:center}
+.header-left{display:flex;align-items:center;gap:10px}
+.header img{height:42px}
+.logout{background:#d32f2f;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;display:none}
+.container{padding:12px}
+.card{background:#fff;border-radius:16px;padding:14px;margin-bottom:14px;box-shadow:0 3px 8px rgba(0,0,0,.2)}
+.menu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.menu-btn{
+ background:#2e7d32;color:#fff;border:none;border-radius:14px;
+ padding:16px;font-weight:700;font-size:14px
+}
+.menu-btn span{display:block;font-size:22px;margin-bottom:4px}
+.stat{display:flex;justify-content:space-between;margin:6px 0;font-weight:600}
+.good{color:#2e7d32}
+.bad{color:#c62828}
+.alert{background:#ffebee;border-left:5px solid #d32f2f;padding:10px;border-radius:10px;margin-top:10px;font-weight:700;color:#b71c1c;display:none}
+.total-box{margin-top:10px;background:#e8f5e9;padding:10px;border-radius:12px;text-align:right;font-weight:700;color:#1b5e20}
+h3{margin-top:0;color:#2e7d32}
+input,button{width:100%;padding:10px;margin-top:6px;border-radius:10px;border:1px solid #ccc}
+button{border:none;font-weight:600}
+.simpan{background:#2e7d32;color:#fff}
+.edit{background:#fbc02d}
+.hapus{background:#d32f2f;color:#fff}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+th,td{border:1px solid #ddd;padding:6px;text-align:center}
+th{background:#c8e6c9}
+.section{display:none}
+.section.active{display:block}
+.back{background:#455a64;color:#fff;margin-bottom:8px}
+.bad-cell{background:#ffebee;color:#c62828;font-weight:700}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+ <div class="header-left">
+  <img src="logo.png">
+  <b>Monitoring Kandang Ayam</b>
+ </div>
+ <button class="logout" id="logoutBtn" onclick="logout()">Logout</button>
+</div>
+
+<!-- LOGIN -->
+<div class="container" id="authSection">
+<div class="card">
+<h3>Login</h3>
+<input id="loginEmail" placeholder="Email">
+<input id="loginPassword" type="password">
+<button class="simpan" onclick="login()">Login</button>
+</div>
+</div>
+
+<!-- APP -->
+<div class="container" id="appSection" style="display:none">
+
+<!-- DASHBOARD -->
+<div class="section active" id="sectionDashboard">
+<div class="card">
+<h3>Dashboard</h3>
+
+<div class="stat">
+ <span>Produksi Terakhir</span>
+ <span id="dashProduksi" class="good">0</span>
+</div>
+<div class="stat">
+ <span>Total Penjualan</span>
+ <span id="dashJual">Rp 0</span>
+</div>
+<div class="stat">
+ <span>Total Pengeluaran</span>
+ <span id="dashKeluar">Rp 0</span>
+</div>
+<div class="stat">
+ <span>Umur Ayam</span>
+ <span id="dashUmurAyam">-</span>
+</div>
+
+<div class="alert" id="dashAlert">⚠️ Produksi menurun dari hari sebelumnya</div>
+
+<div class="menu-grid">
+ <button class="menu-btn" onclick="openMenu('Produksi')"><span>🥚</span>Produksi</button>
+ <button class="menu-btn" onclick="openMenu('Penjualan')"><span>💰</span>Penjualan</button>
+ <button class="menu-btn" onclick="openMenu('Pengeluaran')"><span>🧾</span>Pengeluaran</button>
+ <button class="menu-btn" onclick="openMenu('UmurAyam')">
+ <span>🐔</span>Umur Ayam
+</button>
+<button class="menu-btn" onclick="openMenu('Populasi')">
+ <span>🐓</span>Populasi
+</button>
+<button class="menu-btn" onclick="openMenu('Pakan')">
+ <span>🌾</span>Pakan
+</button>
+</div>
+</div>
+</div>
+
+<!-- Pull to Refresh Indicator -->
+<div id="pullRefresh" style="
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 50px;
+  width: 50px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+">
+  <div class="spinner" style="
+    border: 4px solid #ccc;
+    border-top: 4px solid #2e7d32;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    animation: spin 1s linear infinite;
+  "></div>
+</div>
+
+<style>
+@keyframes spin {
+  0% { transform: rotate(0deg);}
+  100% { transform: rotate(360deg);}
+}
+</style>
+
+<!-- PRODUKSI -->
+<div class="section" id="sectionProduksi">
+<button class="back" onclick="back()">⬅ Kembali ke Dashboard</button>
+<div class="card">
+<h3>Produksi Telur</h3>
+<div class="alert" id="alertProduksi">⚠️ Produksi menurun dari hari sebelumnya</div>
+
+<input type="hidden" id="editProduksi">
+<input type="date" id="tanggal">
+<input id="hari" placeholder="Hari">
+<input type="number" id="k1" placeholder="Kandang 1">
+<input type="number" id="k2" placeholder="Kandang 2">
+<input type="number" id="k3" placeholder="Kandang 3">
+<input type="number" id="k4" placeholder="Kandang 4">
+<input type="number" id="retak" placeholder="Telur Retak">
+<input type="number" id="rusak" placeholder="Telur Rusak">
+<button class="simpan" onclick="simpanProduksi()">Simpan / Update</button>
+
+<!-- Filter Bulan & Tahun -->
+<label for="filterBulanProduksi">Pilih Bulan:</label>
+<select id="filterBulanProduksi">
+  <option value="">-- Pilih Bulan --</option>
+  <option value="0">Januari</option>
+  <option value="1">Februari</option>
+  <option value="2">Maret</option>
+  <option value="3">April</option>
+  <option value="4">Mei</option>
+  <option value="5">Juni</option>
+  <option value="6">Juli</option>
+  <option value="7">Agustus</option>
+  <option value="8">September</option>
+  <option value="9">Oktober</option>
+  <option value="10">November</option>
+  <option value="11">Desember</option>
+</select>
+
+<label for="filterTahunProduksi">Pilih Tahun:</label>
+<select id="filterTahunProduksi">
+  <option value="">-- Pilih Tahun --</option>
+  <option value="2023">2023</option>
+  <option value="2024">2024</option>
+  <option value="2025">2025</option>
+  <option value="2026">2026</option>
+  <option value="2027">2027</option>
+</select>
+
+<button class="simpan" id="btnFilterProduksi">Tampilkan</button>
+<table>
+<thead>
+<tr><th>Tgl</th><th>Hari</th><th>K1</th><th>K2</th><th>K3</th><th>K4</th><th>Retak</th><th>Rusak</th><th>Total Layak</th><th>Aksi</th></tr>
+</thead>
+<tbody id="dataProduksi"></tbody>
+</table>
+</div>
+</div>
+
+<!-- PENJUALAN -->
+<div class="section" id="sectionPenjualan">
+<button class="back" onclick="back()">⬅ Kembali ke Dashboard</button>
+<div class="card">
+<h3>Penjualan</h3>
+<input type="hidden" id="editJual">
+<input type="date" id="tglJual">
+<input type="number" id="kg" placeholder="KG">
+<input type="number" id="harga" placeholder="Harga / KG">
+<input id="ketJual" placeholder="Keterangan (contoh: telur retak)">
+<button class="simpan" onclick="simpanJual()">Simpan / Update</button>
+<label for="filterBulanJual">Pilih Bulan:</label>
+<select id="filterBulanJual">
+  <option value="">-- Pilih Bulan --</option>
+  <option value="0">Januari</option>
+  <option value="1">Februari</option>
+  <option value="2">Maret</option>
+  <option value="3">April</option>
+  <option value="4">Mei</option>
+  <option value="5">Juni</option>
+  <option value="6">Juli</option>
+  <option value="7">Agustus</option>
+  <option value="8">September</option>
+  <option value="9">Oktober</option>
+  <option value="10">November</option>
+  <option value="11">Desember</option>
+</select>
+
+<label for="filterTahunJual">Pilih Tahun:</label>
+<select id="filterTahunJual">
+  <option value="">-- Pilih Tahun --</option>
+  <option value="2023">2023</option>
+  <option value="2024">2024</option>
+  <option value="2025">2025</option>
+  <option value="2026">2026</option>
+  <option value="2027">2027</option>
+</select>
+
+<button class="simpan" id="btnFilterJual">Tampilkan</button>
+<table>
+<thead>
+<tr>
+ <th>Tgl</th>
+ <th>KG</th>
+ <th>Harga</th>
+ <th>Keterangan</th>
+ <th>Total</th>
+ <th>Aksi</th>
+</tr>
+</thead>
+
+<tbody id="dataJual"></tbody>
+
+</table>
+
+<div class="total-box">Total Penjualan: <span id="totalJual">Rp 0</span></div>
+</div>
+</div>
+
+<!-- PENGELUARAN -->
+<div class="section" id="sectionPengeluaran">
+<button class="back" onclick="back()">⬅ Kembali ke Dashboard</button>
+<div class="card">
+<h3>Pengeluaran</h3>
+<input type="hidden" id="editKeluar">
+<input type="date" id="tglKeluar">
+<input id="ket" placeholder="Keterangan">
+<input type="number" id="nominal" placeholder="Nominal">
+<button class="simpan" onclick="simpanKeluar()">Simpan / Update</button>
+
+<label for="filterBulanKeluar">Pilih Bulan:</label>
+<select id="filterBulanKeluar">
+  <option value="">-- Pilih Bulan --</option>
+  <option value="0">Januari</option>
+  <option value="1">Februari</option>
+  <option value="2">Maret</option>
+  <option value="3">April</option>
+  <option value="4">Mei</option>
+  <option value="5">Juni</option>
+  <option value="6">Juli</option>
+  <option value="7">Agustus</option>
+  <option value="8">September</option>
+  <option value="9">Oktober</option>
+  <option value="10">November</option>
+  <option value="11">Desember</option>
+</select>
+
+<label for="filterTahunKeluar">Pilih Tahun:</label>
+<select id="filterTahunKeluar">
+  <option value="">-- Pilih Tahun --</option>
+  <option value="2023">2023</option>
+  <option value="2024">2024</option>
+  <option value="2025">2025</option>
+  <option value="2026">2026</option>
+  <option value="2027">2027</option>
+</select>
+
+<button class="simpan" id="btnFilterKeluar">Tampilkan</button>
+<table>
+<thead><tr><th>Tgl</th><th>Keterangan</th><th>Nominal</th><th>Aksi</th></tr></thead>
+<tbody id="dataKeluar"></tbody>
+</table>
+
+<div class="total-box">Total Pengeluaran: <span id="totalKeluar">Rp 0</span></div>
+</div>
+</div>
+<div class="section" id="sectionUmurAyam">
+<button class="back" onclick="back()">⬅ Kembali ke Dashboard</button>
+
+<div class="card">
+<h3>Input Umur Ayam</h3>
+
+<label>Tanggal Ayam Masuk Kandang</label>
+<input type="date" id="tglMasukAyam">
+
+<label>Umur Ayam Saat Masuk (Minggu)</label>
+<input type="number" id="umurAyamSaatIni" placeholder="Contoh: 18">
+
+<input type="hidden" id="editUmurAyam">
+
+<button class="simpan" onclick="simpanUmurAyam()">Simpan</button>
+</div>
+
+<div class="card">
+<h3>Umur Ayam Sekarang</h3>
+<div id="umurAyamDetail">-</div>
+</div>
+</div>
+
+
+<!-- POPULASI AYAM -->
+<div class="section" id="sectionPopulasi">
+<button class="back" onclick="back()">⬅ Kembali ke Dashboard</button>
+
+<div class="card">
+<h3>Input Populasi Ayam</h3>
+
+<input type="hidden" id="editPopulasi">
+
+<label>Tanggal</label>
+<input type="date" id="tglPopulasi">
+
+<label>Populasi Awal</label>
+<input type="number" id="popAwal" placeholder="Jumlah ayam awal">
+
+<label>Ayam Mati / Afkir</label>
+<input type="number" id="popKeluar" placeholder="Jumlah ayam mati / afkir">
+
+<button class="simpan" onclick="simpanPopulasi()">Simpan</button>
+</div>
+
+<div class="card">
+<h3>Data Populasi</h3>
+<label for="filterBulanPopulasi">Pilih Bulan:</label>
+<select id="filterBulanPopulasi">
+  <option value="">-- Pilih Bulan --</option>
+  <option value="0">Januari</option>
+  <option value="1">Februari</option>
+  <option value="2">Maret</option>
+  <option value="3">April</option>
+  <option value="4">Mei</option>
+  <option value="5">Juni</option>
+  <option value="6">Juli</option>
+  <option value="7">Agustus</option>
+  <option value="8">September</option>
+  <option value="9">Oktober</option>
+  <option value="10">November</option>
+  <option value="11">Desember</option>
+</select>
+
+<label for="filterTahunPopulasi">Pilih Tahun:</label>
+<select id="filterTahunPopulasi">
+  <option value="">-- Pilih Tahun --</option>
+  <option value="2023">2023</option>
+  <option value="2024">2024</option>
+  <option value="2025">2025</option>
+  <option value="2026">2026</option>
+  <option value="2027">2027</option>
+</select>
+
+<button class="simpan" id="btnFilterPopulasi">Tampilkan</button>
+<table>
+<thead>
+<tr>
+ <th>Tanggal</th>
+ <th>Awal</th>
+ <th>Keluar</th>
+ <th>Sisa</th>
+ <th>Aksi</th>
+</tr>
+</thead>
+<tbody id="dataPopulasi"></tbody>
+</table>
+</div>
+
+<div class="card">
+<h3>Populasi Saat Ini</h3>
+<div class="total-box">
+ <span id="populasiSekarang">0</span> ekor
+</div>
+</div>
+</div>
+<!-- PAKAN -->
+<div class="section" id="sectionPakan">
+<button class="back" onclick="back()">⬅ Kembali ke Dashboard</button>
+
+<div class="card">
+<h3>Penggunaan Pakan</h3>
+<div class="alert" id="alertPakan">⚠️ Penggunaan pakan meningkat</div>
+
+<input type="hidden" id="editPakan">
+<input type="date" id="tglPakan">
+
+<input type="number" id="jumlahPakan" placeholder="Jumlah Pakan (Kg)">
+<input id="ketPakan" placeholder="Keterangan">
+
+<button class="simpan" onclick="simpanPakan()">Simpan / Update</button>
+
+<!-- Filter Bulan & Tahun -->
+<label for="filterBulanPakan">Pilih Bulan:</label>
+<select id="filterBulanPakan">
+  <option value="">-- Pilih Bulan --</option>
+  <option value="0">Januari</option>
+  <option value="1">Februari</option>
+  <option value="2">Maret</option>
+  <option value="3">April</option>
+  <option value="4">Mei</option>
+  <option value="5">Juni</option>
+  <option value="6">Juli</option>
+  <option value="7">Agustus</option>
+  <option value="8">September</option>
+  <option value="9">Oktober</option>
+  <option value="10">November</option>
+  <option value="11">Desember</option>
+</select>
+
+<label for="filterTahunPakan">Pilih Tahun:</label>
+<select id="filterTahunPakan">
+  <option value="">-- Pilih Tahun --</option>
+  <option value="2023">2023</option>
+  <option value="2024">2024</option>
+  <option value="2025">2025</option>
+  <option value="2026">2026</option>
+  <option value="2027">2027</option>
+</select>
+
+<button class="simpan" id="btnFilterPakan">Tampilkan</button>
+
+<table>
+<thead>
+<tr>
+ <th>Tgl</th>
+ <th>Jumlah (Kg)</th>
+ <th>Keterangan</th>
+ <th>Aksi</th>
+</tr>
+</thead>
+<tbody id="dataPakan"></tbody>
+</table>
+
+</div>
+</div>
+</div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+
+const app=initializeApp({
+ apiKey:"AIzaSyA4xDRXOhlpX-CZpFzq9iKL_cZafEIYYjM",
+ authDomain:"sumberfarm-621d9.firebaseapp.com",
+ projectId:"sumberfarm-621d9"
+});
+const auth=getAuth(app);
+const db=getFirestore(app);
+const rp=n=>"Rp "+(n||0).toLocaleString("id-ID");
+
+/* NAV */
+window.openMenu=n=>{
+ document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+ document.getElementById('section'+n).classList.add('active');
+};
+window.back=()=>openMenu('Dashboard');
+
+/* LOGIN */
+window.login=async()=>{
+ await signInWithEmailAndPassword(auth,loginEmail.value,loginPassword.value);
+ authSection.style.display="none";
+ appSection.style.display="block";
+ logoutBtn.style.display="block";
+ loadAll();
+};
+window.logout=async()=>{
+ await signOut(auth);
+ appSection.style.display="none";
+ authSection.style.display="block";
+ logoutBtn.style.display="none";
+};
+
+/* === PRODUKSI === */
+window.simpanProduksi = async () => {
+
+ const k1v = +k1.value || 0;
+ const k2v = +k2.value || 0;
+ const k3v = +k3.value || 0;
+ const k4v = +k4.value || 0;
+ const retakv = +retak.value || 0;
+ const rusakv = +rusak.value || 0;
+
+ const totalProduksi = k1v + k2v + k3v + k4v;
+ const totalLayak = Math.max(0, totalProduksi - retakv - rusakv);
+
+ const data = {
+  tanggal: tanggal.value,
+  hari: hari.value,
+  k1: k1v,
+  k2: k2v,
+  k3: k3v,
+  k4: k4v,
+  retak: retakv,
+  rusak: rusakv,
+  total: totalLayak
+ };
+
+ editProduksi.value
+  ? await updateDoc(doc(db,"produksi",editProduksi.value), data)
+  : await addDoc(collection(db,"produksi"), data);
+
+ editProduksi.value = "";
+ tampilProduksi();
+};
+
+async function tampilProduksi(){
+ dataProduksi.innerHTML="";alertProduksi.style.display="none";dashAlert.style.display="none";
+ let last=null,akhir=0,peringatan=false;
+ (await getDocs(query(collection(db,"produksi"),orderBy("tanggal","asc"))))
+ .forEach(d=>{
+  const x=d.data();
+  const tglData = new Date(x.tanggal);
+
+  // filter bulan aktif
+  if(tglData.getMonth() !== bulanAktif || tglData.getFullYear() !== tahunAktif) return;
+  
+  const turun=last!==null&&x.total<last;
+  if(turun){alertProduksi.style.display="block";peringatan=true}
+  dataProduksi.innerHTML += `
+<tr>
+<td>${x.tanggal}</td>
+<td>${x.hari}</td>
+<td>${x.k1}</td>
+<td>${x.k2}</td>
+<td>${x.k3}</td>
+<td>${x.k4}</td>
+<td class="bad-cell">${x.retak || 0}</td>
+<td class="bad-cell">${x.rusak || 0}</td>
+<td class="${turun ? 'bad-cell' : ''}">
+ ${x.total}${turun ? ' ⚠️' : ''}
+</td>
+<td>
+ <button class="edit"
+  onclick="editProduksi(
+   '${d.id}',
+   '${x.tanggal}',
+   '${x.hari}',
+   ${x.k1},
+   ${x.k2},
+   ${x.k3},
+   ${x.k4},
+   ${x.retak || 0},
+   ${x.rusak || 0}
+  )">Edit</button>
+ <button class="hapus" onclick="hapus('produksi','${d.id}')">Hapus</button>
+</td>
+</tr>`;
+  last=x.total;akhir=x.total;
+ });
+ dashProduksi.innerText=akhir;
+ dashProduksi.className=peringatan?'bad':'good';
+ if(peringatan)dashAlert.style.display="block";
+}
+window.editProduksi = (i,t,h,a,b,c,d,rk,rs) => {
+ editProduksi.value = i;
+ tanggal.value = t;
+ hari.value = h;
+ k1.value = a;
+ k2.value = b;
+ k3.value = c;
+ k4.value = d;
+ retak.value = rk;
+ rusak.value = rs;
+};
+const btnFilterProduksi = document.getElementById('btnFilterProduksi');
+btnFilterProduksi.addEventListener('click', () => {
+  const bulan = filterBulanProduksi.value;
+  const tahun = filterTahunProduksi.value;
+  
+  bulanAktif = bulan !== "" ? parseInt(bulan) : new Date().getMonth();
+  tahunAktif = tahun !== "" ? parseInt(tahun) : new Date().getFullYear();
+  
+  tampilProduksi();
+});
+
+/* === PENJUALAN === */
+window.simpanJual = async () => {
+  
+ const total = (+kg.value || 0) * (+harga.value || 0);
+
+ const data = {
+  tanggal: tglJual.value,
+  kg: +kg.value || 0,
+  harga: +harga.value || 0,
+  keterangan: ketJual.value || "",
+  total: total
+ };
+
+ editJual.value
+  ? await updateDoc(doc(db,"penjualan",editJual.value), data)
+  : await addDoc(collection(db,"penjualan"), data);
+
+ editJual.value = "";
+ ketJual.value = "";
+ tampilJual();
+};
+async function tampilJual(){
+ let t=0;dataJual.innerHTML="";
+ (await getDocs(query(collection(db,"penjualan"),orderBy("tanggal","asc"))))
+ .forEach(d=>{
+  const x=d.data();
+  const tglData = new Date(x.tanggal);
+
+  // filter bulan aktif
+  if(tglData.getMonth() !== bulanAktif || tglData.getFullYear() !== tahunAktif) return;
+  
+  t+=x.total;
+  dataJual.innerHTML += `
+<tr>
+ <td>${x.tanggal}</td>
+ <td>${x.kg}</td>
+ <td>${rp(x.harga)}</td>
+ <td>${x.keterangan ? x.keterangan : "-"}</td>
+ <td>${rp(x.total)}</td>
+ <td>
+  <button class="edit"
+   onclick="editJual(
+    '${d.id}',
+    '${x.tanggal}',
+    ${x.kg},
+    ${x.harga},
+    '${x.keterangan ? x.keterangan : ""}'
+   )">Edit</button>
+  <button class="hapus" onclick="hapus('penjualan','${d.id}')">Hapus</button>
+ </td>
+</tr>`;
+  
+ });
+ totalJual.innerText=rp(t);
+ dashJual.innerText=rp(t);
+}
+window.editJual = (i,t,k,h,ket) => {
+ editJual.value = i;
+ tglJual.value = t;
+ kg.value = k;
+ harga.value = h;
+ ketJual.value = ket;
+};
+const btnFilterJual = document.getElementById('btnFilterJual');
+btnFilterJual.addEventListener('click', () => {
+  const bulan = filterBulanJual.value;
+  const tahun = filterTahunJual.value;
+  
+  bulanAktif = bulan !== "" ? parseInt(bulan) : new Date().getMonth();
+  tahunAktif = tahun !== "" ? parseInt(tahun) : new Date().getFullYear();
+  
+  tampilJual();
+});
+/* === PENGELUARAN === */
+window.simpanKeluar=async()=>{
+ const data={tanggal:tglKeluar.value,ket:ket.value,nominal:+nominal.value};
+ editKeluar.value
+ ? await updateDoc(doc(db,"pengeluaran",editKeluar.value),data)
+ : await addDoc(collection(db,"pengeluaran"),data);
+ editKeluar.value="";
+ tampilKeluar();
+};
+async function tampilKeluar(){
+ let t=0;dataKeluar.innerHTML="";
+ (await getDocs(query(collection(db,"pengeluaran"),orderBy("tanggal","asc"))))
+ .forEach(d=>{
+  const x=d.data();
+  const tglData = new Date(x.tanggal);
+
+  // filter bulan aktif
+  if(tglData.getMonth() !== bulanAktif || tglData.getFullYear() !== tahunAktif) return;
+  
+  t+=x.nominal;
+  dataKeluar.innerHTML+=`
+<tr>
+<td>${x.tanggal}</td><td>${x.ket}</td><td>${rp(x.nominal)}</td>
+<td>
+<button class="edit" onclick="editKeluar('${d.id}','${x.tanggal}','${x.ket}',${x.nominal})">Edit</button>
+<button class="hapus" onclick="hapus('pengeluaran','${d.id}')">Hapus</button>
+</td>
+</tr>`;
+ });
+ totalKeluar.innerText=rp(t);
+ dashKeluar.innerText=rp(t);
+}
+window.editKeluar=(i,t,k,n)=>{
+ editKeluar.value=i;
+ tglKeluar.value=t;ket.value=k;nominal.value=n;
+};
+const btnFilterKeluar = document.getElementById('btnFilterKeluar');
+btnFilterKeluar.addEventListener('click', () => {
+  const bulan = filterBulanKeluar.value;
+  const tahun = filterTahunKeluar.value;
+  
+  bulanAktif = bulan !== "" ? parseInt(bulan) : new Date().getMonth();
+  tahunAktif = tahun !== "" ? parseInt(tahun) : new Date().getFullYear();
+  
+  tampilKeluar();
+});
+/* === UMUR AYAM === */
+window.simpanUmurAyam = async () => {
+
+ const tgl = tglMasukAyam.value;
+ const umur = Number(umurAyamSaatIni.value);
+
+ if(!tgl) return alert("Tanggal masuk ayam wajib diisi");
+ if(isNaN(umur) || umur < 0)
+  return alert("Umur ayam harus angka (minggu)");
+
+ const data = {
+  tanggalMasuk: tgl,
+  umurAwalMinggu: umur
+ };
+
+ if(editUmurAyam.value){
+  await updateDoc(doc(db,"umurAyam",editUmurAyam.value), data);
+ }else{
+  await addDoc(collection(db,"umurAyam"), data);
+ }
+
+ alert("Umur ayam tersimpan");
+ tampilUmurAyam();
+};
+async function tampilUmurAyam(){
+ let teks = "-";
+
+ const snap = await getDocs(collection(db,"umurAyam"));
+ snap.forEach(d=>{
+  editUmurAyam.value = d.id;
+  const x = d.data();
+
+  if(!x.tanggalMasuk || typeof x.umurAwalMinggu !== "number"){
+   teks = "Data umur ayam belum lengkap";
+   return;
+  }
+
+  const masuk = new Date(x.tanggalMasuk);
+  if(isNaN(masuk.getTime())){
+   teks = "Tanggal masuk tidak valid";
+   return;
+  }
+
+  const now = new Date();
+  const selisihHari = Math.floor((now - masuk) / 86400000);
+  const totalHari = (x.umurAwalMinggu * 7) + Math.max(0, selisihHari);
+
+  const minggu = Math.floor(totalHari / 7);
+  const hari = totalHari % 7;
+
+  teks = minggu + " Minggu " + hari + " Hari";
+ });
+
+ umurAyamDetail.innerText = teks;
+ dashUmurAyam.innerText = teks;
+}
+/* === POPULASI AYAM === */
+window.simpanPopulasi = async () => {
+
+ const awal = +popAwal.value || 0;
+ const keluar = +popKeluar.value || 0;
+ const sisa = Math.max(0, awal - keluar);
+
+ const data = {
+  tanggal: tglPopulasi.value,
+  awal: awal,
+  keluar: keluar,
+  sisa: sisa
+ };
+
+ editPopulasi.value
+  ? await updateDoc(doc(db,"populasi",editPopulasi.value), data)
+  : await addDoc(collection(db,"populasi"), data);
+
+ editPopulasi.value = "";
+ tampilPopulasi();
+};
+
+async function tampilPopulasi(){
+ let terakhir = 0;
+ dataPopulasi.innerHTML = "";
+
+ const snap = await getDocs(query(collection(db,"populasi"),orderBy("tanggal","asc")));
+ snap.forEach(d=>{
+  const x = d.data();
+  const tglData = new Date(x.tanggal);
+
+  // filter bulan aktif
+  if(tglData.getMonth() !== bulanAktif || tglData.getFullYear() !== tahunAktif) return;
+  
+  terakhir = x.sisa;
+
+  dataPopulasi.innerHTML += `
+<tr>
+ <td>${x.tanggal}</td>
+ <td>${x.awal}</td>
+ <td class="bad-cell">${x.keluar}</td>
+ <td><b>${x.sisa}</b></td>
+ <td>
+  <button class="edit"
+   onclick="editPopulasi(
+    '${d.id}',
+    '${x.tanggal}',
+    ${x.awal},
+    ${x.keluar}
+   )">Edit</button>
+  <button class="hapus" onclick="hapus('populasi','${d.id}')">Hapus</button>
+ </td>
+</tr>`;
+ });
+
+ populasiSekarang.innerText = terakhir;
+}
+
+window.editPopulasi = (i,t,a,k) => {
+ editPopulasi.value = i;
+ tglPopulasi.value = t;
+ popAwal.value = a;
+ popKeluar.value = k;
+};
+const btnFilterPopulasi = document.getElementById('btnFilterPopulasi');
+btnFilterPopulasi.addEventListener('click', () => {
+  const bulan = filterBulanPopulasi.value;
+  const tahun = filterTahunPopulasi.value;
+  
+  bulanAktif = bulan !== "" ? parseInt(bulan) : new Date().getMonth();
+  tahunAktif = tahun !== "" ? parseInt(tahun) : new Date().getFullYear();
+  
+  tampilPopulasi();
+});
+
+/* === PAKAN === */
+window.simpanPakan = async () => {
+
+ const jumlahv = +jumlahPakan.value || 0;
+
+ const data = {
+  tanggal: tglPakan.value,
+  jumlah: jumlahv,
+  keterangan: ketPakan.value || ""
+ };
+
+ editPakan.value
+  ? await updateDoc(doc(db,"pakan",editPakan.value), data)
+  : await addDoc(collection(db,"pakan"), data);
+
+ editPakan.value = "";
+ tampilPakan();
+};
+
+async function tampilPakan(){
+ let total = 0;
+ dataPakan.innerHTML="";
+const snap = (await getDocs(query(collection(db,"pakan"),orderBy("tanggal","asc"))))
+ snap.forEach(d=>{
+  const x = d.data();
+  const tglData = new Date(x.tanggal);
+
+  // filter bulan & tahun pakan
+  if(
+    tglData.getMonth() !== bulanFilterPakan ||
+    tglData.getFullYear() !== tahunFilterPakan
+  ) return;
+
+  total += x.jumlah;
+
+  dataPakan.innerHTML += `
+<tr>
+ <td>${x.tanggal}</td>
+ <td>${x.jumlah}</td>
+ <td>${x.keterangan || "-"}</td>
+ <td>
+  <button class="edit"
+   onclick="editPakan(
+    '${d.id}',
+    '${x.tanggal}',
+    ${x.jumlah},
+    '${x.keterangan || ""}'
+   )">Edit</button>
+  <button class="hapus" onclick="hapus('pakan','${d.id}')">Hapus</button>
+ </td>
+</tr>`;
+ });
+
+ totalPakan.innerText = total;
+}
+
+window.editPakan = (i,t,j,k) => {
+ editPakan.value = i;
+ tglPakan.value = t;
+ jumlahPakan.value = j;
+ ketPakan.value = k;
+};
+
+/* === FILTER PAKAN === */
+let bulanFilterPakan = new Date().getMonth();
+let tahunFilterPakan = new Date().getFullYear();
+
+const btnFilterPakan = document.getElementById('btnFilterPakan');
+btnFilterPakan.addEventListener('click', () => {
+
+ const bulan = filterBulanPakan.value;
+ const tahun = filterTahunPakan.value;
+
+ bulanFilterPakan = bulan !== "" ? parseInt(bulan) : new Date().getMonth();
+ tahunFilterPakan = tahun !== "" ? parseInt(tahun) : new Date().getFullYear();
+
+ tampilPakan();
+});
+
+window.hapus=async(c,i)=>{await deleteDoc(doc(db,c,i));loadAll();}
+function loadAll(){tampilProduksi();tampilJual();tampilKeluar();tampilUmurAyam();tampilPopulasi();
+  tampilPakan();
+}
+
+// ============================
+// BULAN AKTIF
+// ============================
+const now = new Date();
+let bulanAktif = now.getMonth(); // 0 = Januari, 11 = Desember
+let tahunAktif = now.getFullYear();
+setInterval(()=>{
+    const sekarang = new Date();
+    if(sekarang.getMonth() !== bulanAktif || sekarang.getFullYear() !== tahunAktif){
+        bulanAktif = sekarang.getMonth();
+        tahunAktif = sekarang.getFullYear();
+        loadAll(); // refresh semua tabel
+    }
+}, 3600000); // cek tiap 1 jam
+// ============================
+// PULL TO REFRESH HALUS
+// ============================
+let startY = 0;
+let isPulling = false;
+const pullIndicator = document.getElementById('pullRefresh');
+const appSectionEl = document.getElementById('appSection');
+
+appSectionEl.addEventListener('touchstart', (e) => {
+    if (document.documentElement.scrollTop === 0) { // hanya jika di atas
+        startY = e.touches[0].clientY;
+        isPulling = true;
+    }
+});
+
+appSectionEl.addEventListener('touchmove', (e) => {
+    if (!isPulling) return;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - startY;
+    if (diff > 0) {
+        pullIndicator.style.display = "flex";
+        pullIndicator.style.transform = `translate(-50%, ${diff}px)`;
+    }
+});
+
+appSectionEl.addEventListener('touchend', (e) => {
+    if (!isPulling) return;
+    const endY = e.changedTouches[0].clientY;
+    const diff = endY - startY;
+    if (diff > 50) { // tarik minimal 50px untuk trigger refresh
+        pullIndicator.style.display = "flex";
+        pullIndicator.style.transform = `translate(-50%, 20px)`;
+        // jalankan refresh
+        setTimeout(async () => {
+            await loadAll();
+            pullIndicator.style.display = "none"; // sembunyikan indikator
+        }, 500); // delay agar spinner terlihat
+    } else {
+        pullIndicator.style.display = "none";
+    }
+    isPulling = false;
+});
+// Optional: Update bulan otomatis
+// ============================
+setInterval(()=>{
+    const sekarang = new Date();
+    if(sekarang.getMonth() !== bulanAktif || sekarang.getFullYear() !== tahunAktif){
+        bulanAktif = sekarang.getMonth();
+        tahunAktif = sekarang.getFullYear();
+        loadAll();
+    }
+}, 3600000);
+</script>
+
+</body>
+</html>
